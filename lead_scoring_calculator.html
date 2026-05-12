@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead Scoring Calculator — CRM Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0ede8;
+    --muted: #888580;
+    --hint: #555250;
+    --teal: #1D9E75;
+    --teal-light: #9FE1CB;
+    --amber: #EF9F27;
+    --amber-light: #FAC775;
+    --coral: #D85A30;
+    --gray: #888780;
+    --green-bg: rgba(29,158,117,0.12);
+    --amber-bg: rgba(239,159,39,0.1);
+    --gray-bg: rgba(136,135,128,0.1);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* Layout */
+  .shell {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 32px;
+  }
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .18em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -.02em;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 520px;
+    line-height: 1.7;
+  }
+
+  /* Score card */
+  .score-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 24px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .score-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--tier-accent, var(--gray));
+    transition: background .4s;
+  }
+  .score-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 56px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--text);
+    min-width: 88px;
+  }
+  .score-denom {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--hint);
+    margin-top: 4px;
+  }
+  .bar-col { flex: 1; }
+  .bar-track {
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--tier-accent, var(--gray));
+    width: 0%;
+    transition: width .4s cubic-bezier(.4,0,.2,1), background .4s;
+  }
+  .tier-stops {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--hint);
+    letter-spacing: .04em;
+  }
+  .tier-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 6px;
+    background: var(--tier-badge-bg, var(--gray-bg));
+    color: var(--tier-badge-color, var(--gray));
+    border: 1px solid var(--tier-badge-border, rgba(136,135,128,.2));
+    white-space: nowrap;
+    transition: all .4s;
+  }
+
+  /* Action box */
+  .action-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--tier-accent, var(--hint));
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 40px;
+    transition: border-color .4s;
+  }
+  .action-box strong { color: var(--text); font-weight: 500; }
+
+  /* Two-col grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+
+  /* Section card */
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .section-head {
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .section-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .section-max {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--hint);
+  }
+
+  /* Criteria rows */
+  .crit-row {
+    display: grid;
+    grid-template-columns: 1fr 36px;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .crit-row:last-child { border-bottom: none; }
+  .crit-row:hover { background: rgba(255,255,255,.02); }
+  .crit-name {
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .crit-sub {
+    font-size: 11px;
+    color: var(--hint);
+    margin-bottom: 6px;
+  }
+  select {
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23555250' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 26px;
+  }
+  select:focus { border-color: var(--teal); }
+  .pts-cell {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: right;
+    min-width: 32px;
+    transition: color .2s;
+  }
+  .pts-cell.pos { color: var(--teal-light); }
+  .pts-cell.neg { color: var(--coral); }
+  .pts-cell.zero { color: var(--hint); }
+
+  /* Reset button */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .footer-note {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--hint);
+    letter-spacing: .04em;
+  }
+  .btn-reset {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-reset:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+
+  /* Tier reference */
+  .tier-ref {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 40px;
+  }
+  @media (max-width: 620px) { .tier-ref { grid-template-columns: repeat(2,1fr); } }
+  .tier-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-top: 2px solid var(--chip-color);
+  }
+  .tier-chip-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--chip-color);
+    margin-bottom: 4px;
+  }
+  .tier-chip-range {
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .tier-chip-action {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Print styles */
+  @media print {
+    body { background: white; color: black; }
+    .shell { padding: 20px; }
+    select { border: 1px solid #ccc; background: white; color: black; }
+    .score-card, .section-card, .action-box { border-color: #ddd; background: #f9f9f9; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="eyebrow">CRM Blueprint</div>
+    <h1>Lead scoring calculator</h1>
+    <p class="subtitle">Score each lead across firmographic fit and behavioural signals. The tier updates live as you select. Save this file to use offline anytime.</p>
+  </header>
+
+  <!-- Tier reference -->
+  <div class="tier-ref">
+    <div class="tier-chip" style="--chip-color:#D3D1C7">
+      <div class="tier-chip-label">Cold</div>
+      <div class="tier-chip-range">0 – 29</div>
+      <div class="tier-chip-action">Nurture only. No rep assigned.</div>
+    </div>
+    <div class="tier-chip" style="--chip-color:#EF9F27">
+      <div class="tier-chip-label">Warm</div>
+      <div class="tier-chip-range">30 – 59</div>
+      <div class="tier-chip-action">3-touch personal outreach. Monthly cadence.</div>
+    </div>
+    <div class="tier-chip" style="--chip-color:#1D9E75">
+      <div class="tier-chip-label">Hot</div>
+      <div class="tier-chip-range">60 – 79</div>
+      <div class="tier-chip-action">Assign rep. Call within 24 hours.</div>
+    </div>
+    <div class="tier-chip" style="--chip-color:#5DCAA5">
+      <div class="tier-chip-label">Fire</div>
+      <div class="tier-chip-range">80 – 100</div>
+      <div class="tier-chip-action">Best rep. Call within 2 hours. Priority flag.</div>
+    </div>
+  </div>
+
+  <!-- Score card -->
+  <div class="score-card" id="scoreCard">
+    <div>
+      <div class="score-num" id="scoreNum">0</div>
+      <div class="score-denom">/ 100 pts</div>
+    </div>
+    <div>
+      <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+      <div class="tier-stops">
+        <span>0</span><span>30</span><span>60</span><span>80</span><span>100</span>
+      </div>
+    </div>
+    <div class="tier-badge" id="tierBadge">Cold</div>
+  </div>
+  <div class="action-box" id="actionBox">
+    <strong>Action:</strong> Add to nurture sequence only. Do not assign a sales rep yet. Re-score after 60 days or when behaviour changes.
+  </div>
+
+  <!-- Criteria grid -->
+  <div class="grid">
+
+    <!-- Firmographic -->
+    <div class="section-card">
+      <div class="section-head">
+        <span class="section-title">Firmographic fit</span>
+        <span class="section-max">max 55 pts</span>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Company revenue</div>
+          <div class="crit-sub">Proxy for deal size potential</div>
+          <select id="revenue" onchange="calc()">
+            <option value="0">Unknown</option>
+            <option value="5">Below RM500K / yr</option>
+            <option value="10">RM500K – RM2M</option>
+            <option value="15">RM2M – RM10M</option>
+            <option value="20">RM10M – RM50M</option>
+            <option value="25">Above RM50M</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-revenue">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Industry fit</div>
+          <div class="crit-sub">Match to your core verticals</div>
+          <select id="industry" onchange="calc()">
+            <option value="0">Outside target sectors</option>
+            <option value="5">Adjacent / possible fit</option>
+            <option value="10">Core target industry</option>
+            <option value="15">Ideal vertical — proven ROI</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-industry">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Decision-maker level</div>
+          <div class="crit-sub">Who you're speaking to</div>
+          <select id="dm" onchange="calc()">
+            <option value="0">Unknown / gatekeeper</option>
+            <option value="3">Manager / team lead</option>
+            <option value="7">Director / HOD</option>
+            <option value="10">C-suite / owner / founder</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-dm">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Budget confirmed</div>
+          <div class="crit-sub">Has a budget been indicated?</div>
+          <select id="budget" onchange="calc()">
+            <option value="0">No budget mentioned</option>
+            <option value="3">Exists, amount unknown</option>
+            <option value="5">Confirmed and aligned</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-budget">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Lead source</div>
+          <div class="crit-sub">Quality signal of intent</div>
+          <select id="source" onchange="calc()">
+            <option value="2">Cold outreach / list</option>
+            <option value="5">LinkedIn / social / ad</option>
+            <option value="7">Event / webinar</option>
+            <option value="8">Website inbound</option>
+            <option value="10">Referral from client</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-source">—</div>
+      </div>
+    </div>
+
+    <!-- Behavioural -->
+    <div class="section-card">
+      <div class="section-head">
+        <span class="section-title">Behavioural engagement</span>
+        <span class="section-max">max 45 pts</span>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Response speed</div>
+          <div class="crit-sub">How fast did they reply?</div>
+          <select id="response" onchange="calc()">
+            <option value="0">No response yet</option>
+            <option value="3">Replied after 1 week</option>
+            <option value="7">Replied within 48 hrs</option>
+            <option value="10">Replied same day</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-response">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Meeting taken</div>
+          <div class="crit-sub">Have they committed time?</div>
+          <select id="meeting" onchange="calc()">
+            <option value="0">No meeting yet</option>
+            <option value="5">Discovery call done</option>
+            <option value="10">Second meeting / demo</option>
+            <option value="15">Multiple — proposal requested</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-meeting">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Urgency / timeline</div>
+          <div class="crit-sub">When do they need a solution?</div>
+          <select id="urgency" onchange="calc()">
+            <option value="0">No timeline given</option>
+            <option value="3">Vague / sometime this year</option>
+            <option value="7">Within 3–6 months</option>
+            <option value="10">Within 30–60 days</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-urgency">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Content engagement</div>
+          <div class="crit-sub">Opened or shared materials?</div>
+          <select id="content" onchange="calc()">
+            <option value="0">Nothing sent yet</option>
+            <option value="2">Sent, no open tracked</option>
+            <option value="5">Opened proposal or deck</option>
+            <option value="8">Forwarded to stakeholder</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-content">—</div>
+      </div>
+
+      <div class="crit-row">
+        <div>
+          <div class="crit-name">Negative signals</div>
+          <div class="crit-sub">Flags that reduce score</div>
+          <select id="neg" onchange="calc()">
+            <option value="0">None</option>
+            <option value="-5">Went silent after interest</option>
+            <option value="-8">Competitor already selected</option>
+            <option value="-10">Price objection, no movement</option>
+            <option value="-15">No budget, timeline, or DM</option>
+          </select>
+        </div>
+        <div class="pts-cell zero" id="p-neg">—</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span class="footer-note">Save this file · Works fully offline · No data sent anywhere</span>
+    <button class="btn-reset" onclick="resetAll()">↺ Reset all</button>
+  </div>
+
+</div>
+
+<script>
+  const fields = ['revenue','industry','dm','budget','source','response','meeting','urgency','content','neg'];
+
+  const tiers = [
+    {
+      min: 80,
+      label: 'Fire',
+      accent: '#5DCAA5',
+      badgeBg: 'rgba(29,158,117,0.15)',
+      badgeColor: '#5DCAA5',
+      badgeBorder: 'rgba(29,158,117,0.3)',
+      short: 'Immediate priority — act within 2 hours',
+      action: 'Assign to your best rep <strong>now</strong>. Call within 2 hours. Move straight to proposal stage. Flag for director-level attention if the deal is large.'
+    },
+    {
+      min: 60,
+      label: 'Hot',
+      accent: '#1D9E75',
+      badgeBg: 'rgba(29,158,117,0.1)',
+      badgeColor: '#1D9E75',
+      badgeBorder: 'rgba(29,158,117,0.2)',
+      short: 'Assign a sales rep — first call within 24 hrs',
+      action: 'Assign a sales rep. First call within <strong>24 hours</strong>. Aim for a demo or proposal within 5 business days. Log all activity in CRM.'
+    },
+    {
+      min: 30,
+      label: 'Warm',
+      accent: '#EF9F27',
+      badgeBg: 'rgba(239,159,39,0.1)',
+      badgeColor: '#EF9F27',
+      badgeBorder: 'rgba(239,159,39,0.2)',
+      short: 'Personal outreach sequence + nurture cadence',
+      action: 'Run a personalised <strong>3-touch outreach</strong> over 2 weeks. Add to monthly nurture cadence. Re-score after each interaction.'
+    },
+    {
+      min: 0,
+      label: 'Cold',
+      accent: '#888780',
+      badgeBg: 'rgba(136,135,128,0.1)',
+      badgeColor: '#888780',
+      badgeBorder: 'rgba(136,135,128,0.15)',
+      short: 'Nurture only — no rep assigned yet',
+      action: 'Add to nurture sequence only. <strong>Do not assign a sales rep yet.</strong> Re-score after 60 days or when behaviour changes.'
+    }
+  ];
+
+  function calc() {
+    let total = 0;
+    fields.forEach(id => {
+      const v = parseInt(document.getElementById(id).value) || 0;
+      total += v;
+      const el = document.getElementById('p-' + id);
+      el.textContent = v === 0 ? '—' : (v > 0 ? '+' + v : v);
+      el.className = 'pts-cell ' + (v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero');
+    });
+    total = Math.max(0, Math.min(100, total));
+
+    document.getElementById('scoreNum').textContent = total;
+    document.getElementById('barFill').style.width = total + '%';
+
+    const t = tiers.find(x => total >= x.min);
+
+    // Update bar + card accent
+    document.getElementById('barFill').style.background = t.accent;
+    document.getElementById('scoreCard').style.setProperty('--tier-accent', t.accent);
+
+    // Badge
+    const badge = document.getElementById('tierBadge');
+    badge.textContent = t.label;
+    badge.style.background = t.badgeBg;
+    badge.style.color = t.badgeColor;
+    badge.style.borderColor = t.badgeBorder;
+
+    // Action box
+    const ab = document.getElementById('actionBox');
+    ab.innerHTML = '<strong>' + t.short + '</strong><br>' + t.action;
+    ab.style.borderLeftColor = t.accent;
+  }
+
+  function resetAll() {
+    fields.forEach(id => {
+      document.getElementById(id).selectedIndex = 0;
+      const el = document.getElementById('p-' + id);
+      el.textContent = '—';
+      el.className = 'pts-cell zero';
+    });
+    document.getElementById('scoreNum').textContent = '0';
+    document.getElementById('barFill').style.width = '0%';
+    document.getElementById('barFill').style.background = '#888780';
+    document.getElementById('scoreCard').style.setProperty('--tier-accent', '#888780');
+    const badge = document.getElementById('tierBadge');
+    badge.textContent = 'Cold';
+    badge.style.background = 'rgba(136,135,128,0.1)';
+    badge.style.color = '#888780';
+    badge.style.borderColor = 'rgba(136,135,128,0.15)';
+    const ab = document.getElementById('actionBox');
+    ab.innerHTML = '<strong>Nurture only — no rep assigned yet</strong><br>Add to nurture sequence only. <strong>Do not assign a sales rep yet.</strong> Re-score after 60 days or when behaviour changes.';
+    ab.style.borderLeftColor = '#888780';
+  }
+
+  calc();
+</script>
+</body>
+</html>
